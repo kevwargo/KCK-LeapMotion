@@ -18,10 +18,10 @@ class SampleListener(Leap.Listener):
         print('inited')
 
     def on_connect(self, controller):
-        # controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
+        controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
         # controller.enable_gesture(Leap.Gesture.TYPE_CIRCLE);
         # controller.enable_gesture(Leap.Gesture.TYPE_KEY_TAP);
-        controller.enable_gesture(Leap.Gesture.TYPE_SCREEN_TAP);
+        # controller.enable_gesture(Leap.Gesture.TYPE_SCREEN_TAP);
         print('connected and enabled swipe')
 
     def on_frame(self, controller):
@@ -43,22 +43,10 @@ class SampleListener(Leap.Listener):
                             wmRightDesktop()
                             # print 'left', gesture.id
                     self.currentSwipe = gesture.id
-                if gesture.type == Leap.Gesture.TYPE_SCREEN_TAP:
-                    tap = ScreenTapGesture(gesture)
-                    # print(self.convertCoord(tap.position[0], tap.position[1]))
-                    wmActivateWindow(wmFindWindowAt(*self.convertCoord(tap.position[0], tap.position[1])))
             # print('----------------------------------------------------')
         else:
             self.currentSwipe = None
             self.swipeCount = 0
-
-    def convertCoord(self, xTap, yTap):
-        xMin, xMax = -120, 140
-        yMin, yMax = 120, 270
-        x = float(xTap - xMin) / (xMax - xMin) * 1366
-        y = (1 - float(yTap - yMin) / (yMax - yMin)) * 768
-        return int(x), int(y)
-
 
 def main():
     listener = SampleListener()
@@ -75,5 +63,4 @@ def main():
 
 if __name__ == '__main__':
     # wmRightDesktop()
-    # print wmFindWindowAt(int(sys.argv[1]), int(sys.argv[2]))
     main()
