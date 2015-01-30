@@ -2,6 +2,7 @@
 
 import Leap, sys
 from Leap import CircleGesture, KeyTapGesture, ScreenTapGesture, SwipeGesture
+from time import time
 
 from wmiface import *
 
@@ -10,18 +11,24 @@ class SampleListener(Leap.Listener):
     bone_names = ['Metacarpal', 'Proximal', 'Intermediate', 'Distal']
     state_names = ['STATE_INVALID', 'STATE_START', 'STATE_UPDATE', 'STATE_END']
 
-    
+
 
     def on_init(self, controller):
-        currentSwipe = None
-        swipeCount = 0
+        self.currentSwipe = None
+        self.swipeCount = 0
+        self.minimized = {}
+        self.grabbed_window = None
+        # self.prev_palm_position
         print('inited')
 
     def on_connect(self, controller):
-        # controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
+        controller.enable_gesture(Leap.Gesture.TYPE_SWIPE)
         # controller.enable_gesture(Leap.Gesture.TYPE_CIRCLE);
         # controller.enable_gesture(Leap.Gesture.TYPE_KEY_TAP);
         controller.enable_gesture(Leap.Gesture.TYPE_SCREEN_TAP);
+
+        controller.config.set('Gesture.Swipe.MinVelocity', 500)
+        controller.config.set('Gesture.Swipe.MinLength', 80)
         print('connected and enabled swipe')
 
     def on_frame(self, controller):
@@ -31,26 +38,67 @@ class SampleListener(Leap.Listener):
             for gesture in gestures:
                 if gesture.type == Leap.Gesture.TYPE_SWIPE:
                     swipe = SwipeGesture(gesture)
+                    # print gesture.id, swipe.direction
                     if gesture.id == self.currentSwipe:
                         self.swipeCount += 1
+                        if self.swipeCount == 6:
+                            if abs(swipe.direction[0]) > abs(swipe.direction[1]):
+                                if swipe.direction[0] > 0:
+                                    wmLeftDesktop()
+                                    # print 'left'
+                                else:
+                                    wmRightDesktop()
+                                    # print 'right'
+                            else:
+                                if swipe.direction[1] > 0:
+                                    m = self.minimized.get(wmGetCurrentDesktop())
+                                    if m:
+                                        w = m.pop(0)
+                                        wmUnminimize(w)
+                                    # print 'up'
+                                else:
+                                    w = wmGetActiveWindow()
+                                    wmMinimize(w)
+                                    d = wmGetCurrentDesktop()
+                                    if not self.minimized.get(d):
+                                        self.minimized[d] = []
+                                    self.minimized[d].insert(0, w)
+                                    # print 'down'
                     else:
                         self.swipeCount = 1
-                    if self.swipeCount == 6:
-                        if swipe.direction[0] > 0:
-                            wmLeftDesktop()
-                            # print 'right', gesture.id
-                        else:
-                            wmRightDesktop()
-                            # print 'left', gesture.id
                     self.currentSwipe = gesture.id
                 if gesture.type == Leap.Gesture.TYPE_SCREEN_TAP:
                     tap = ScreenTapGesture(gesture)
                     # print(self.convertCoord(tap.position[0], tap.position[1]))
-                    wmActivateWindow(wmFindWindowAt(*self.convertCoord(tap.position[0], tap.position[1])))
+                    w = wmFindWindowAt(*self.convertCoord(tap.position[0], tap.position[1]))
+                    if w:
+                        wmActivateWindow(w)
             # print('----------------------------------------------------')
         else:
             self.currentSwipe = None
             self.swipeCount = 0
+            # print 'NO'
+
+        for hand in frame.hands:
+            if hand.pinch_strength > 0.9:
+                if not self.grabbed_window:
+                    w = wmFindWindowAt(*self.convertCoord(hand.stabilized_palm_position[0], hand.stabilized_palm_position[1]))
+                    if w:
+                        wmActivateWindow(w)
+                        self.grabbed_window = w
+                        self.prev_palm_pos = self.convertCoord(
+                            hand.stabilized_palm_position[0],
+                            hand.stabilized_palm_position[1])
+                else:
+                    x, y = self.convertCoord(hand.stabilized_palm_position[0],
+                                             hand.stabilized_palm_position[1])
+                    dx = x - self.prev_palm_pos[0]
+                    dy = y - self.prev_palm_pos[1]
+                    self.prev_palm_pos = x, y
+                    wmMoveWindowRelatively(self.grabbed_window, dx, dy)
+            else:
+                self.grabbed_window = None
+
 
     def convertCoord(self, xTap, yTap):
         xMin, xMax = -120, 140
